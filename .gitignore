@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+
+# Data files
+*.fna
+*.fasta
+*.fa
+*.gbk
+*.gff
+*.gbff
+
+# Results
+*/data/
+*/prokka_results/
+*/roary_results/
+*/gene_sequences/
+*/alignments/
+*/primer3_results/
+
+# Logs
+*.log
+
+# Large files
+assembly_summary.txt
