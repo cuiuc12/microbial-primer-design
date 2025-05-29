@@ -43,16 +43,18 @@ class GenomePipeline:
             max_genes (int): Maximum number of genes to process (None for all genes)
         """
         self.genus = genus
+        self.genus_safe = genus.replace(" ", "_")
         self.outgroup_genera = outgroup_genera or []
+        self.outgroup_genera_safe = [g.replace(" ", "_") for g in (outgroup_genera or [])]
         self.level = level
         self.threads = threads
         self.fast_mode = fast_mode  # Control roary speed mode
         self.assembly_summary_path = assembly_summary_path
         self.max_genes = max_genes  # Maximum number of genes to process
         self.work_dir = Path.cwd()
-        self.genus_dir = self.work_dir / genus
+        self.genus_dir = self.work_dir / self.genus_safe
         self.data_dir = self.genus_dir / "data"
-        self.target_dir = self.data_dir / genus[:3].capitalize()
+        self.target_dir = self.data_dir / self.genus_safe[:3].capitalize()
         self.outgroup_dir = self.data_dir / "outgroup"
         self.prokka_dir = self.genus_dir / "prokka_results"
         self.roary_dir = self.genus_dir / "roary_results"
@@ -67,6 +69,9 @@ class GenomePipeline:
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] {level}: {message}")
+        
+        # 确保日志目录存在
+        self.genus_dir.mkdir(parents=True, exist_ok=True)
         
         # Write to log file
         log_file = self.genus_dir / "pipeline.log"
@@ -87,20 +92,20 @@ class GenomePipeline:
             return False
     
     def activate_conda_env(self, env_name):
-        """激活conda环境"""
+        """激活conda环境 / Activate conda environment"""
         if not self.check_conda_env(env_name):
-            self.log(f"❌ Conda环境 '{env_name}' 不存在", "ERROR")
+            self.log(f"❌ Conda environment '{env_name}' not found", "ERROR")
             return False
         
-        self.log(f"🔄 激活conda环境: {env_name}")
+        self.log(f"🔄 Activating conda environment: {env_name}")
         return True
     
     def run_command_in_env(self, command, env_name, cwd=None):
-        """在指定conda环境中运行命令"""
+        """在指定conda环境中运行命令 / Run command in specified conda environment"""
         if not self.activate_conda_env(env_name):
             return False
             
-        # 构建在conda环境中运行的命令
+        # 构建在conda环境中运行的命令 / Build command to run in conda environment
         if isinstance(command, list):
             cmd_str = " ".join(command)
         else:
@@ -109,7 +114,7 @@ class GenomePipeline:
         full_command = f"conda run -n {env_name} {cmd_str}"
         
         try:
-            self.log(f"🔄 执行命令: {cmd_str}")
+            self.log(f"🔄 Executing command: {cmd_str}")
             result = subprocess.run(
                 full_command,
                 shell=True,
@@ -119,33 +124,33 @@ class GenomePipeline:
             )
             return True
         except subprocess.CalledProcessError as e:
-            self.log(f"❌ 命令执行失败: {e}", "ERROR")
+            self.log(f"❌ Command execution failed: {e}", "ERROR")
             return False
     
     def step1_download(self):
-        """步骤1: 下载基因组"""
-        self.log("🚀 开始步骤1: 下载基因组")
+        """步骤1: 下载基因组 / Step 1: Download genomes"""
+        self.log("🚀 Starting Step 1: Genome download")
         
-        # 检查是否已经下载完成
+        # 检查是否已经下载完成 / Check if download is already completed
         if self.target_dir.exists() and list(self.target_dir.glob("*.fna")):
-            self.log("✅ 目标基因组已存在，跳过下载")
+            self.log("✅ Target genomes already exist, skipping download")
             target_downloaded = True
         else:
             target_downloaded = False
             
         if self.outgroup_genera and self.outgroup_dir.exists() and list(self.outgroup_dir.glob("*.fna")):
-            self.log("✅ 外群基因组已存在，跳过下载")
+            self.log("✅ Outgroup genomes already exist, skipping download")
             outgroup_downloaded = True
         else:
             outgroup_downloaded = False
             
         if target_downloaded and (not self.outgroup_genera or outgroup_downloaded):
-            self.log("✅ 所有基因组已下载完成")
-            # 检查并显示已有的summary文件
+            self.log("✅ All genomes already downloaded")
+            # 检查并显示已有的summary文件 / Check and display existing summary files
             self._check_existing_summary_files()
             return True
         
-        # 使用新的GenomeDownloader
+        # 使用新的GenomeDownloader / Use new GenomeDownloader
         try:
             from .genome_downloader import GenomeDownloader
             
@@ -154,7 +159,7 @@ class GenomePipeline:
                 assembly_summary_path=self.assembly_summary_path
             )
             
-            # 下载目标基因组和外群
+            # 下载目标基因组和外群 / Download target genomes and outgroups
             success = downloader.download_with_outgroup(
                 target_genus=self.genus,
                 outgroup_genera=self.outgroup_genera,
@@ -163,110 +168,126 @@ class GenomePipeline:
             )
             
             if success:
-                self.log("✅ 步骤1完成: 基因组下载")
-                # 显示summary文件位置
+                self.log("✅ Step 1 completed: Genome download")
+                # 显示summary文件位置 / Display summary file locations
                 self._display_summary_files()
                 return True
             else:
-                self.log("❌ 基因组下载失败", "ERROR")
+                self.log("❌ Genome download failed", "ERROR")
                 return False
                 
         except Exception as e:
-            self.log(f"❌ 下载过程中发生错误: {e}", "ERROR")
+            self.log(f"❌ Error during download: {e}", "ERROR")
             return False
     
     def _check_existing_summary_files(self):
-        """检查并显示已存在的summary文件"""
+        """检查并显示已存在的summary文件 / Check and display existing summary files"""
         summary_files = []
         
-        # 检查目标genus的summary文件
-        target_summary = self.genus_dir / f"{self.genus}_genome_summary.csv"
+        # Check target genus summary file
+        target_summary = self.genus_dir / f"{self.genus_safe}_genome_summary.csv"
         if target_summary.exists():
-            summary_files.append(f"目标基因组summary: {target_summary}")
+            summary_files.append(f"Target genome summary: {target_summary}")
         
-        # 检查外群的summary文件
-        for outgroup in self.outgroup_genera or []:
-            outgroup_dir = self.work_dir / outgroup
-            outgroup_summary = outgroup_dir / f"{outgroup}_genome_summary.csv"
+        # Check outgroup summary files
+        for outgroup, outgroup_safe in zip(self.outgroup_genera, self.outgroup_genera_safe):
+            outgroup_dir = self.work_dir / outgroup_safe
+            outgroup_summary = outgroup_dir / f"{outgroup_safe}_genome_summary.csv"
             if outgroup_summary.exists():
-                summary_files.append(f"外群基因组summary: {outgroup_summary}")
+                summary_files.append(f"Outgroup genome summary: {outgroup_summary}")
         
         if summary_files:
-            self.log("📊 已有基因组summary文件:")
-            for summary_file in summary_files:
-                self.log(f"   {summary_file}")
-    
-    def _display_summary_files(self):
-        """显示新生成的summary文件位置"""
-        summary_files = []
-        
-        # 检查目标genus的summary文件
-        target_summary = self.genus_dir / f"{self.genus}_genome_summary.csv"
-        if target_summary.exists():
-            summary_files.append(f"目标基因组summary: {target_summary}")
-        
-        # 检查外群的summary文件
-        for outgroup in self.outgroup_genera or []:
-            outgroup_dir = self.work_dir / outgroup
-            outgroup_summary = outgroup_dir / f"{outgroup}_genome_summary.csv"
-            if outgroup_summary.exists():
-                summary_files.append(f"外群基因组summary: {outgroup_summary}")
-        
-        if summary_files:
-            self.log("📊 基因组summary信息已保存:")
+            self.log("📊 Genome summary files saved:")
             for summary_file in summary_files:
                 self.log(f"   {summary_file}")
         else:
-            self.log("⚠️  未找到基因组summary文件")
+            self.log("⚠️  No genome summary file found")
+    
+    def _display_summary_files(self):
+        """显示新生成的summary文件位置 / Display newly generated summary file locations"""
+        summary_files = []
+        
+        # 检查目标genus的summary文件 / Check target genus summary file
+        target_summary = self.genus_dir / f"{self.genus_safe}_genome_summary.csv"
+        if target_summary.exists():
+            summary_files.append(f"Target genome summary: {target_summary}")
+        
+        # 检查外群的summary文件 / Check outgroup summary files
+        for outgroup, outgroup_safe in zip(self.outgroup_genera, self.outgroup_genera_safe):
+            outgroup_dir = self.work_dir / outgroup_safe
+            outgroup_summary = outgroup_dir / f"{outgroup_safe}_genome_summary.csv"
+            if outgroup_summary.exists():
+                summary_files.append(f"Outgroup genome summary: {outgroup_summary}")
+        
+        if summary_files:
+            self.log("📊 Genome summary information saved:")
+            for summary_file in summary_files:
+                self.log(f"   {summary_file}")
+        else:
+            self.log("⚠️  No genome summary file found")
     
     def step2_prokka(self):
-        """步骤2: Prokka注释 (并行优化版本)"""
-        self.log("🚀 开始步骤2: Prokka注释")
+        """步骤2: Prokka注释 (并行优化版本) / Step 2: Prokka annotation (parallel optimized version)"""
+        self.log("🚀 Starting Step 2: Prokka annotation")
         
-        # 创建prokka结果目录
+        # 创建prokka结果目录 / Create prokka results directory
         self.prokka_dir.mkdir(exist_ok=True)
         
-        # 收集所有需要注释的fna文件
+        # Collect all fna files that need annotation
         fna_files = []
         
-        # 目标基因组文件
+        # 目标基因组文件 / Target genome files
         if self.target_dir.exists():
             fna_files.extend(list(self.target_dir.glob("*.fna")))
         
-        # 外群文件
+        # 外群文件 / Outgroup files
         if self.outgroup_dir.exists():
             fna_files.extend(list(self.outgroup_dir.glob("*.fna")))
         
         if not fna_files:
-            self.log("❌ 没有找到需要注释的fna文件", "ERROR")
+            self.log("❌ No fna files found for annotation", "ERROR")
             return False
         
-        self.log(f"📋 找到 {len(fna_files)} 个基因组需要注释")
+        self.log(f"📋 Found {len(fna_files)} genomes for annotation")
         
-        # 检查已完成的注释
+        # 检查已完成的注释 / Check completed annotations
         remaining_files = []
         for fna_file in fna_files:
             sample_name = fna_file.stem
             gff_file = self.prokka_dir / sample_name / f"{sample_name}.gff"
             if gff_file.exists():
-                self.log(f"✅ {sample_name} 注释已存在，跳过")
+                self.log(f"✅ {sample_name} annotation already exists, skipping")
             else:
                 remaining_files.append(fna_file)
         
         if not remaining_files:
-            self.log("✅ 所有基因组注释已完成")
+            self.log("✅ All genome annotations completed")
             return True
         
-        self.log(f"🔄 需要注释 {len(remaining_files)} 个基因组")
+        self.log(f"🔄 Need to annotate {len(remaining_files)} genomes")
         
-        # 一次性检查prokka环境
+        # 一次性检查prokka环境 / Check prokka environment once
         if not self.check_conda_env("prokka"):
-            self.log("❌ Conda环境 'prokka' 不存在", "ERROR")
+            self.log("❌ Conda environment 'prokka' not found", "ERROR")
             return False
         
-        # 并行执行prokka注释
+        # 优化并行策略和CPU分配 / Optimized parallel strategy and CPU allocation
+        if len(remaining_files) <= 3:
+            # 少量基因组：串行处理，每个使用更多CPU / Few genomes: serial processing with more CPUs each
+            max_workers = 1
+            cpus_per_prokka = min(self.threads, 16)  # 单个Prokka进程最多使用16个CPU / Single Prokka process uses max 16 CPUs
+            self.log(f"🚀 Using serial processing strategy: {cpus_per_prokka} CPUs per genome")
+        else:
+            # 多个基因组：并行处理，但限制并发数以避免资源竞争
+            # Multiple genomes: parallel processing with limited concurrency to avoid resource contention
+            max_workers = min(max(1, self.threads // 8), len(remaining_files))  # 每个进程至少8个CPU / At least 8 CPUs per process
+            cpus_per_prokka = max(1, self.threads // max_workers)
+            cpus_per_prokka = min(cpus_per_prokka, 16)  # 限制最大CPU数 / Limit max CPU count
+            self.log(f"🚀 Using parallel processing strategy: {max_workers} parallel processes, {cpus_per_prokka} CPUs each")
+        
+        # 并行执行prokka注释 / Execute prokka annotation in parallel
         def run_single_prokka(fna_file):
-            """运行单个基因组的prokka注释"""
+            """运行单个基因组的prokka注释 / Run prokka annotation for single genome"""
             sample_name = fna_file.stem
             output_dir = self.prokka_dir / sample_name
             
@@ -276,13 +297,13 @@ class GenomePipeline:
                 "--outdir", str(output_dir),
                 "--prefix", sample_name,
                 "--kingdom", "Bacteria",
-                "--cpus", "1",  # 每个prokka进程使用1个CPU
+                "--cpus", str(cpus_per_prokka),  # 使用预计算的CPU数量 / Use pre-calculated CPU count
                 "--force",
                 str(fna_file)
             ]
             
             try:
-                self.log(f"🔄 开始注释: {sample_name}")
+                self.log(f"🔄 Starting annotation: {sample_name} (using {cpus_per_prokka} CPUs)")
                 result = subprocess.run(
                     cmd,
                     cwd=self.work_dir,
@@ -290,30 +311,30 @@ class GenomePipeline:
                     capture_output=True,
                     text=True
                 )
-                self.log(f"✅ 注释完成: {sample_name}")
+                self.log(f"✅ Annotation completed: {sample_name}")
                 return sample_name, True, None
             except subprocess.CalledProcessError as e:
                 error_msg = f"stderr: {e.stderr[:200]}..." if e.stderr else str(e)
-                self.log(f"❌ 注释失败 {sample_name}: {error_msg}", "ERROR")
+                self.log(f"❌ Annotation failed {sample_name}: {error_msg}", "ERROR")
                 return sample_name, False, error_msg
         
-        # 计算合适的并行数量
-        # 总CPU数除以每个prokka进程的CPU数，但不超过基因组数量
+        # 计算合适的并行数量 / Calculate appropriate parallel count
+        # 总CPU数除以每个prokka进程的CPU数，但不超过基因组数量 / Total CPUs divided by CPUs per prokka process, but not exceeding genome count
         max_workers = min(self.threads, len(remaining_files))
-        self.log(f"🚀 使用 {max_workers} 个并行进程进行注释")
+        self.log(f"🚀 Using {max_workers} parallel processes for annotation")
         
-        # 执行并行注释
+        # 执行并行注释 / Execute parallel annotation
         success_count = 0
         failed_samples = []
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 提交所有任务
+            # 提交所有任务 / Submit all tasks
             future_to_file = {
                 executor.submit(run_single_prokka, fna_file): fna_file 
                 for fna_file in remaining_files
             }
             
-            # 处理完成的任务
+            # 处理完成的任务 / Process completed tasks
             for future in as_completed(future_to_file):
                 fna_file = future_to_file[future]
                 try:
@@ -324,16 +345,16 @@ class GenomePipeline:
                         failed_samples.append(sample_name)
                 except Exception as exc:
                     sample_name = fna_file.stem
-                    self.log(f"❌ {sample_name} 执行出错: {exc}", "ERROR")
+                    self.log(f"❌ {sample_name} execution error: {exc}", "ERROR")
                     failed_samples.append(sample_name)
         
-        # 报告结果
-        self.log(f"📊 注释完成统计: 成功 {success_count}/{len(remaining_files)}")
+        # 报告结果 / Report results
+        self.log(f"📊 Annotation completion statistics: {success_count}/{len(remaining_files)} successful")
         if failed_samples:
-            self.log(f"❌ 失败的样本: {', '.join(failed_samples)}", "ERROR")
+            self.log(f"❌ Failed samples: {', '.join(failed_samples)}", "ERROR")
             return False
         
-        self.log("✅ 步骤2完成: Prokka注释")
+        self.log("✅ Step 2 completed: Prokka annotation")
         return True
     
     def step3_roary(self):
@@ -375,15 +396,15 @@ class GenomePipeline:
         # 清理可能存在的空目录，避免roary创建时间戳目录
         if self.roary_dir.exists():
             try:
-                # 如果目录为空或只包含空文件，删除它
+                # 如果目录为空或不包含主要结果文件，删除它
                 if not any(self.roary_dir.iterdir()) or not (self.roary_dir / "gene_presence_absence.csv").exists():
                     shutil.rmtree(self.roary_dir)
                     self.log(f"🧹 清理空的roary目录: {self.roary_dir}")
             except Exception as e:
                 self.log(f"⚠️  清理目录时出现警告: {e}")
         
-        # 创建roary结果目录
-        self.roary_dir.mkdir(exist_ok=True)
+        # 不要预先创建输出目录，让Roary自己创建
+        # 移除这行: self.roary_dir.mkdir(exist_ok=True)
         
         # 运行Roary - 根据模式选择参数
         if self.fast_mode:
@@ -409,12 +430,12 @@ class GenomePipeline:
             "-i", "95",     # 身份阈值95% (引物设计需要更高保守性)
             "-cd", "100",   # 核心基因定义阈值100% (引物目标必须在所有基因组中存在)
             "-v",           # 详细输出
-            "-f", str(self.roary_dir)  # 输出目录
+            "-f", str(self.roary_dir)  # 输出目录 - Roary会创建这个目录
         ] + [str(f) for f in gff_files]
         
         try:
             self.log(f"🔄 运行Roary泛基因组分析 - {mode_desc}")
-            self.log(f"📁 输出目录: {self.roary_dir}")
+            self.log(f"📁 Roary将创建输出目录: {self.roary_dir}")
             result = subprocess.run(
                 cmd,
                 cwd=self.work_dir,
@@ -736,14 +757,14 @@ class GenomePipeline:
                             seq_record.description = f"{sample} {gene}"
                             seqs.append(seq_record)
                 
-                if len(seqs) >= 2:  # 至少需要2个序列才能进行比对
+                if len(seqs) >= 2:  # 至少需要2个序列才能进行比对 / At least 2 sequences needed for alignment
                     output_file = extract_dir / f"{gene}.fa"
                     SeqIO.write(seqs, output_file, "fasta")
-                    self.log(f"✅ 提取基因序列: {gene} ({len(seqs)} 个序列)")
+                    self.log(f"✅ Extracted gene sequences: {gene} ({len(seqs)} sequences)")
                     return gene, len(seqs), True, None
                 else:
-                    self.log(f"⚠️  基因序列不足: {gene} (只有 {len(seqs)} 个序列)")
-                    return gene, len(seqs), False, "序列数量不足"
+                    self.log(f"⚠️  Insufficient gene sequences: {gene} (only {len(seqs)} sequences)")
+                    return gene, len(seqs), False, "Insufficient sequence count"
             
             except Exception as e:
                 self.log(f"❌ 提取基因序列失败 {gene}: {e}", "ERROR")
@@ -1612,13 +1633,13 @@ class GenomePipeline:
         
         # 显示基因组summary文件
         summary_files = []
-        target_summary = self.genus_dir / f"{self.genus}_genome_summary.csv"
+        target_summary = self.genus_dir / f"{self.genus_safe}_genome_summary.csv"
         if target_summary.exists():
             summary_files.append(f"   - 目标基因组summary: {target_summary}")
         
-        for outgroup in self.outgroup_genera or []:
-            outgroup_dir = self.work_dir / outgroup
-            outgroup_summary = outgroup_dir / f"{outgroup}_genome_summary.csv"
+        for outgroup, outgroup_safe in zip(self.outgroup_genera, self.outgroup_genera_safe):
+            outgroup_dir = self.work_dir / outgroup_safe
+            outgroup_summary = outgroup_dir / f"{outgroup_safe}_genome_summary.csv"
             if outgroup_summary.exists():
                 summary_files.append(f"   - 外群基因组summary: {outgroup_summary}")
         

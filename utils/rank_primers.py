@@ -44,43 +44,43 @@ def main():
     args = parser.parse_args()
     
     try:
-        print("📊 引物质量评分工具 / Primer Quality Ranking Tool")
-        print(f"📥 输入文件 / Input file: {args.input_file}")
-        print(f"📤 输出文件 / Output file: {args.output_file}")
+        print("📊 Primer Quality Ranking Tool")
+        print(f"📥 Input file: {args.input_file}")
+        print(f"📤 Output file: {args.output_file}")
         
-        # 检查输入文件
+        # 检查输入文件 / Check input file
         if not Path(args.input_file).exists():
-            print(f"❌ 输入文件不存在 / Input file not found: {args.input_file}")
+            print(f"❌ Input file not found: {args.input_file}")
             sys.exit(1)
         
-        # 质量评分和排序
+        # 质量评分和排序 / Quality scoring and ranking
         ranker = PrimerQualityRanker()
         df = ranker.rank_primers(args.input_file, args.output_file)
         
-        print(f"✅ 成功评分 {len(df)} 对引物 / Successfully ranked {len(df)} primer pairs")
-        print(f"📁 结果已保存到 / Results saved to: {args.output_file}")
+        print(f"✅ Successfully ranked {len(df)} primer pairs")
+        print(f"📁 Results saved to: {args.output_file}")
         
         if len(df) > 0:
-            print(f"\n🏆 最佳引物 / Top primer: {df.iloc[0]['ID']} (分数/Score: {df.iloc[0]['Quality_Score']:.2f})")
+            print(f"\n🏆 Top primer: {df.iloc[0]['ID']} (Score: {df.iloc[0]['Quality_Score']:.2f})")
         
         if args.summary or args.verbose:
             summary = ranker.get_quality_summary(df)
-            print("\n📈 质量摘要 / Quality Summary:")
-            print(f"   总引物数 / Total primers: {summary.get('total_primers', 0)}")
-            print(f"   高质量 (≥80) / High quality: {summary.get('high_quality', 0)}")
-            print(f"   中等质量 (60-79) / Medium quality: {summary.get('medium_quality', 0)}")
-            print(f"   低质量 (<60) / Low quality: {summary.get('low_quality', 0)}")
-            print(f"   平均分数 / Average score: {summary.get('avg_quality_score', 0):.2f}")
+            print("\n📈 Quality Summary:")
+            print(f"   Total primers: {summary.get('total_primers', 0)}")
+            print(f"   High quality (≥80): {summary.get('high_quality', 0)}")
+            print(f"   Medium quality (60-79): {summary.get('medium_quality', 0)}")
+            print(f"   Low quality (<60): {summary.get('low_quality', 0)}")
+            print(f"   Average score: {summary.get('avg_quality_score', 0):.2f}")
             
             if args.verbose:
-                print(f"   平均Tm(左) / Avg Tm(left): {summary.get('avg_tm_left', 0):.1f}°C")
-                print(f"   平均Tm(右) / Avg Tm(right): {summary.get('avg_tm_right', 0):.1f}°C")
-                print(f"   平均GC(左) / Avg GC(left): {summary.get('avg_gc_left', 0):.1f}%")
-                print(f"   平均GC(右) / Avg GC(right): {summary.get('avg_gc_right', 0):.1f}%")
-                print(f"   平均产物大小 / Avg product size: {summary.get('avg_product_size', 0):.1f}bp")
+                print(f"   Avg Tm(left): {summary.get('avg_tm_left', 0):.1f}°C")
+                print(f"   Avg Tm(right): {summary.get('avg_tm_right', 0):.1f}°C")
+                print(f"   Avg GC(left): {summary.get('avg_gc_left', 0):.1f}%")
+                print(f"   Avg GC(right): {summary.get('avg_gc_right', 0):.1f}%")
+                print(f"   Avg product size: {summary.get('avg_product_size', 0):.1f}bp")
         
     except Exception as e:
-        print(f"❌ 评分失败 / Ranking failed: {e}")
+        print(f"❌ Ranking failed: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()

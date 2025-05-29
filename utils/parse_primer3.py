@@ -38,30 +38,30 @@ def main():
     args = parser.parse_args()
     
     try:
-        print("🔧 Primer3结果解析工具 / Primer3 Result Parser")
-        print(f"📥 输入文件 / Input file: {args.input_file}")
-        print(f"📤 输出文件 / Output file: {args.output_file}")
+        print("🔧 Primer3 Result Parser")
+        print(f"📥 Input file: {args.input_file}")
+        print(f"📤 Output file: {args.output_file}")
         
-        # 检查输入文件
+        # 检查输入文件 / Check input file
         if not Path(args.input_file).exists():
-            print(f"❌ 输入文件不存在 / Input file not found: {args.input_file}")
+            print(f"❌ Input file not found: {args.input_file}")
             sys.exit(1)
         
-        # 解析文件
+        # 解析文件 / Parse file
         parser_obj = Primer3Parser()
         df = parser_obj.parse_file(args.input_file, args.output_file)
         
-        print(f"✅ 成功解析 {len(df)} 对引物 / Successfully parsed {len(df)} primer pairs")
-        print(f"📁 结果已保存到 / Results saved to: {args.output_file}")
+        print(f"✅ Successfully parsed {len(df)} primer pairs")
+        print(f"📁 Results saved to: {args.output_file}")
         
         if args.verbose and len(df) > 0:
-            print("\n📊 解析结果摘要 / Parsing Summary:")
-            print(f"   引物对数量 / Number of primer pairs: {len(df)}")
-            print(f"   基因数量 / Number of genes: {df['Gene'].nunique()}")
-            print(f"   平均产物大小 / Average product size: {df['Product_Size'].mean():.1f} bp")
+            print("\n📊 Parsing Summary:")
+            print(f"   Number of primer pairs: {len(df)}")
+            print(f"   Number of genes: {df['Gene'].nunique()}")
+            print(f"   Average product size: {df['Product_Size'].mean():.1f} bp")
         
     except Exception as e:
-        print(f"❌ 解析失败 / Parsing failed: {e}")
+        print(f"❌ Parsing failed: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()

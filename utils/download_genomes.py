@@ -52,32 +52,32 @@ def main():
     args = parser.parse_args()
     
     try:
-        print("📥 基因组下载工具 / Genome Download Tool")
-        print(f"🎯 目标属 / Target genus: {args.genus}")
+        print("📥 Genome Download Tool")
+        print(f"🎯 Target genus: {args.genus}")
         if args.outgroup:
-            print(f"🔗 外群 / Outgroups: {', '.join(args.outgroup)}")
-        print(f"📊 组装级别 / Assembly level: {args.level}")
-        print(f"⚙️  线程数 / Threads: {args.threads}")
+            print(f"🔗 Outgroups: {', '.join(args.outgroup)}")
+        print(f"📊 Assembly level: {args.level}")
+        print(f"⚙️  Threads: {args.threads}")
         
-        # 创建下载器
+        # 创建下载器 / Create downloader
         downloader = GenomeDownloader(args.work_dir)
         
-        # 下载基因组
+        # 下载基因组 / Download genomes
         if args.outgroup:
-            print("\n🚀 开始下载目标属和外群基因组 / Starting download of target and outgroup genomes")
+            print("\n🚀 Starting download of target and outgroup genomes")
             success = downloader.download_with_outgroup(
                 args.genus, args.outgroup, args.level, args.threads
             )
         else:
-            print(f"\n🚀 开始下载 {args.genus} 基因组 / Starting download of {args.genus} genomes")
+            print(f"\n🚀 Starting download of {args.genus} genomes")
             success = downloader.download_genus(
                 args.genus, args.level, args.threads
             )
         
         if success:
-            print("\n✅ 下载完成！/ Download completed successfully!")
+            print("\n✅ Download completed successfully!")
             
-            # 显示下载结果
+            # 显示下载结果 / Display download results
             work_dir = Path(args.work_dir) if args.work_dir else Path.cwd()
             genus_dir = work_dir / args.genus
             target_dir = genus_dir / "data" / args.genus[:3].capitalize()
@@ -85,32 +85,32 @@ def main():
             
             if target_dir.exists():
                 target_files = list(target_dir.glob("*.fna"))
-                print(f"📁 目标基因组 / Target genomes: {len(target_files)} 个文件 / files")
+                print(f"📁 Target genomes: {len(target_files)} files")
                 if args.verbose:
-                    for f in target_files[:3]:  # 显示前3个
+                    for f in target_files[:3]:  # 显示前3个 / Show first 3
                         print(f"   - {f.name}")
                     if len(target_files) > 3:
-                        print(f"   - ... 还有 {len(target_files)-3} 个文件 / and {len(target_files)-3} more")
+                        print(f"   - ... and {len(target_files)-3} more files")
             
             if outgroup_dir.exists():
                 outgroup_files = list(outgroup_dir.glob("*.fna"))
                 if outgroup_files:
-                    print(f"📁 外群基因组 / Outgroup genomes: {len(outgroup_files)} 个文件 / files")
+                    print(f"📁 Outgroup genomes: {len(outgroup_files)} files")
                     if args.verbose:
                         for f in outgroup_files:
                             print(f"   - {f.name}")
             
-            print(f"\n📂 结果目录 / Result directory: {genus_dir}")
+            print(f"\n📂 Result directory: {genus_dir}")
             
         else:
-            print("❌ 下载失败 / Download failed")
+            print("❌ Download failed")
             sys.exit(1)
             
     except KeyboardInterrupt:
-        print("\n⚠️  用户中断下载 / User interrupted download")
+        print("\n⚠️  User interrupted download")
         sys.exit(1)
     except Exception as e:
-        print(f"❌ 下载过程中发生错误 / Error during download: {e}")
+        print(f"❌ Error during download: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()

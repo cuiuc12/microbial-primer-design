@@ -140,22 +140,22 @@ class Primer3Parser:
 
 def main():
     """
-    Command line interface for Primer3Parser
+    命令行接口 / Command line interface
     """
     import argparse
-    
     parser = argparse.ArgumentParser(description="Parse Primer3 output files")
     parser.add_argument("input_file", help="Input Primer3 output file")
     parser.add_argument("output_file", help="Output CSV file")
-    
     args = parser.parse_args()
-    
-    # Parse the file
+
+    # 自动将路径中的空格替换为下划线 / Auto replace spaces with underscores in file paths
+    input_file = args.input_file.replace(" ", "_")
+    output_file = args.output_file.replace(" ", "_")
+
     p3_parser = Primer3Parser()
-    df = p3_parser.parse_file(args.input_file, args.output_file)
-    
-    print(f"Parsed {len(df)} primer pairs from {args.input_file}")
-    print(f"Results saved to {args.output_file}")
+    df = p3_parser.parse_file(input_file, output_file)
+    print(f"Parsed {len(df)} primer pairs from {input_file}")
+    print(f"Results saved to {output_file}")
 
 
 if __name__ == "__main__":

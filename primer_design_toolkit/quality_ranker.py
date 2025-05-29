@@ -428,38 +428,21 @@ class PrimerQualityRanker:
 
 def main():
     """
-    增强版引物质量评分器的命令行界面 / Command line interface for enhanced PrimerQualityRanker
+    命令行接口 / Command line interface
     """
     import argparse
-    
-    parser = argparse.ArgumentParser(description="Enhanced primer quality ranking with parallel processing")
+    parser = argparse.ArgumentParser(description="Primer quality ranking")
     parser.add_argument("input_file", help="Input parsed primer CSV file")
     parser.add_argument("output_file", help="Output ranked CSV file")
-    parser.add_argument("--threads", type=int, default=4, 
-                       help="Number of threads for parallel processing (default: 4)")
-    parser.add_argument("--summary", action="store_true", 
-                       help="Print detailed quality summary")
-    
+    parser.add_argument("--threads", type=int, default=4, help="Number of threads")
     args = parser.parse_args()
-    
-    # 设置日志记录 / Setup logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    
-    # 使用增强算法对引物进行排序 / Rank primers with enhanced algorithm
+
+    # 自动将路径中的空格替换为下划线 / Auto replace spaces with underscores in file paths
+    input_file = args.input_file.replace(" ", "_")
+    output_file = args.output_file.replace(" ", "_")
+
     ranker = PrimerQualityRanker(threads=args.threads)
-    df = ranker.rank_primers(args.input_file, args.output_file)
-    
-    print(f"\nSuccessfully evaluated {len(df)} primer pairs")
-    print(f"Results saved to: {args.output_file}")
-    
-    if args.summary:
-        summary = ranker.get_quality_summary(df)
-        print(f"\nDetailed statistics:")
-        for key, value in summary.items():
-            if isinstance(value, float):
-                print(f"   {key}: {value:.2f}")
-            else:
-                print(f"   {key}: {value}")
+    ranker.rank_primers(input_file, output_file)
 
 
 if __name__ == "__main__":
