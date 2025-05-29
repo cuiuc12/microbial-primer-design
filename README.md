@@ -1,8 +1,29 @@
 # 微生物引物设计工具包 / Microbial Primer Design Toolkit
 
-一个用于微生物特异性引物设计的完整流水线工具包。
+**专业的genus水平微生物特异性引物设计完整解决方案**
 
-A comprehensive pipeline toolkit for microbial-specific primer design.
+**Professional genus-level microbial-specific primer design complete solution**
+
+## 🎯 工具概述 / Tool Overview
+
+本工具包是专门针对**genus水平微生物**开发的引物设计自动化流水线，能够设计出高特异性的PCR引物用于微生物检测和鉴定。通过比较目标genus与外群genus的基因组差异，自动识别特异性基因并设计相应引物。
+
+This toolkit is an automated primer design pipeline specifically developed for **genus-level microorganisms**, capable of designing highly specific PCR primers for microbial detection and identification. By comparing genomic differences between target genus and outgroup genera, it automatically identifies specific genes and designs corresponding primers.
+
+### 🔬 应用场景 / Application Scenarios
+
+- **临床微生物检测** / Clinical microbial detection - 病原菌快速鉴定 / Rapid pathogen identification
+- **食品安全检测** / Food safety testing - 食源性病原菌检测 / Foodborne pathogen detection  
+- **环境微生物监测** / Environmental microbial monitoring - 特定菌群检测 / Specific bacterial community detection
+- **科研实验** / Research experiments - 微生物群落分析 / Microbial community analysis
+- **质量控制** / Quality control - 微生物污染检测 / Microbial contamination detection
+
+### 🧬 技术特点 / Technical Features
+
+- **Genus水平特异性** / Genus-level specificity - 基于泛基因组分析确保引物特异性 / Pan-genome analysis ensures primer specificity
+- **自动化外群比较** / Automated outgroup comparison - 智能识别目标genus特有基因 / Intelligent identification of target genus-specific genes
+- **多维质量评估** / Multi-dimensional quality assessment - 10维度引物质量评分系统 / 10-dimensional primer quality scoring system
+- **高通量并行处理** / High-throughput parallel processing - 支持大规模基因组数据处理 / Support for large-scale genomic data processing
 
 ## 🚀 特性 / Features
 
