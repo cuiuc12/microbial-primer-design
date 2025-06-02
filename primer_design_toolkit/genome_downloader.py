@@ -70,9 +70,66 @@ class GenomeDownloader:
         found = False
         with open(self.assembly_summary_path, "r") as infile, open(list_file, "w") as outfile:
             for line in infile:
-                if genus in line and level in line:  # 用原始genus做过滤 / Use original genus for filtering
-                    outfile.write(line)
-                    found = True
+                # 改进过滤逻辑：更精确的genus匹配 / Improved filtering logic: more precise genus matching
+                if level in line:  # 首先检查assembly level / First check assembly level
+                    # 提取organism_name字段进行精确匹配 / Extract organism_name field for precise matching
+                    fields = line.strip().split('\t')
+                    if len(fields) > 7:  # 确保有足够的字段 / Ensure enough fields
+                        organism_name = fields[7]  # organism_name 通常在第8列 / organism_name usually in 8th column
+                        # 精确匹配species名称 / Precise species name matching
+                        # 检查organism_name是否完全匹配或者以species名称开头（后面跟空格或结束）
+                        # Check if organism_name exactly matches or starts with species name (followed by space or end)
+                        if (organism_name == genus or 
+                            organism_name.startswith(genus + " ") or
+                            organism_name.startswith(genus + "\t")):
+                            outfile.write(line)
+                            found = True
+        return str(list_file) if found else None
+    
+    def extract_genomes_to_target_dir(self, genus, level="Complete Genome", target_dir=None, list_filename=None):
+        """
+        提取指定genus的基因组accession到目标目录 / Extract genome accessions for a specific genus to target directory
+        主要用于外群，避免创建额外的genus目录 / Mainly for outgroups, avoiding creating extra genus directories
+        
+        Args:
+            genus (str): 目标属名 / Target genus name  
+            level (str): 组装级别过滤 / Assembly level filter
+            target_dir (Path): 目标目录 / Target directory
+            list_filename (str): list文件名 / List filename
+        Returns:
+            str: 生成的list文件路径 / Path to the generated list file
+        """
+        genus_safe = genus.replace(" ", "_")
+        
+        # 确定保存目录和文件名 / Determine save directory and filename
+        if target_dir is not None:
+            save_dir = target_dir
+        else:
+            save_dir = self.work_dir / genus_safe
+        save_dir.mkdir(exist_ok=True)
+        
+        if list_filename is not None:
+            list_file = save_dir / list_filename
+        else:
+            list_file = save_dir / f"{genus_safe}_list.txt"
+            
+        found = False
+        with open(self.assembly_summary_path, "r") as infile, open(list_file, "w") as outfile:
+            for line in infile:
+                # 改进过滤逻辑：更精确的genus匹配 / Improved filtering logic: more precise genus matching
+                if level in line:  # 首先检查assembly level / First check assembly level
+                    # 提取organism_name字段进行精确匹配 / Extract organism_name field for precise matching
+                    fields = line.strip().split('\t')
+                    if len(fields) > 7:  # 确保有足够的字段 / Ensure enough fields
+                        organism_name = fields[7]  # organism_name 通常在第8列 / organism_name usually in 8th column
+                        # 精确匹配species名称 / Precise species name matching
+                        # 检查organism_name是否完全匹配或者以species名称开头（后面跟空格或结束）
+                        # Check if organism_name exactly matches or starts with species name (followed by space or end)
+                        if (organism_name == genus or 
+                            organism_name.startswith(genus + " ") or
+                            organism_name.startswith(genus + "\t")):
+                            outfile.write(line)
+                            found = True
         return str(list_file) if found else None
     
     def extract_genome_summary(self, genus, level="Complete Genome"):
@@ -110,7 +167,8 @@ class GenomeDownloader:
                 low_memory=False
             )
             filtered_df = df[
-                (df['organism_name'].str.contains(genus, case=False, na=False)) &
+                ((df['organism_name'] == genus) | 
+                 (df['organism_name'].str.startswith(genus + " ", na=False))) &
                 (df['assembly_level'] == level)
             ]
             if len(filtered_df) == 0:
@@ -182,7 +240,8 @@ class GenomeDownloader:
                 low_memory=False
             )
             filtered_df = df[
-                (df['organism_name'].str.contains(genus, case=False, na=False)) &
+                ((df['organism_name'] == genus) | 
+                 (df['organism_name'].str.startswith(genus + " ", na=False))) &
                 (df['assembly_level'] == level)
             ]
             if len(filtered_df) == 0:
@@ -341,6 +400,82 @@ class GenomeDownloader:
         
         return True
     
+    def unzip_outgroup_files_to_temp(self, download_dir, temp_extract_dir, genus_safe):
+        """
+        解压指定genus的zip文件到临时目录 / Extract specific genus zip files to temporary directory
+        专门用于外群，避免解压目标菌的zip文件 / Specifically for outgroups, avoiding extracting target genus zip files
+        
+        Args:
+            download_dir (Path): 包含zip文件的下载目录 / Directory containing zip files
+            temp_extract_dir (Path): 临时解压目录 / Temporary extraction directory
+            genus_safe (str): 安全的genus名称，用于匹配zip文件 / Safe genus name for matching zip files
+            
+        Returns:
+            bool: 成功状态 / Success status
+        """
+        print(f"🔄 [{download_dir.name}] Extracting {genus_safe} zip files to temporary directory...")
+        
+        # 从zip文件夹中获取zip文件 / Get zip files from zip folder
+        zip_folder = download_dir / "zip"
+        if not zip_folder.exists():
+            print(f"⚠️  [{download_dir.name}] Zip folder not found")
+            return False
+        
+        # 只获取与当前genus相关的zip文件 / Only get zip files related to current genus
+        # 这里我们需要一个更智能的方法来识别哪些zip文件属于当前genus
+        # 由于外群的zip文件是刚刚下载的，我们可以通过时间戳或者其他方式来识别
+        # 但更简单的方法是通过accession列表来匹配
+        
+        # 读取genus的accession列表 / Read genus accession list
+        list_file = None
+        for potential_list in download_dir.rglob(f"{genus_safe}_outgroup_list.txt"):
+            list_file = potential_list
+            break
+        
+        if not list_file or not list_file.exists():
+            print(f"⚠️  [{genus_safe}] Outgroup list file not found")
+            return False
+        
+        # 读取accession列表 / Read accession list
+        target_accessions = set()
+        with open(list_file, 'r') as f:
+            for line in f:
+                accession = line.strip().split('\t')[0]
+                target_accessions.add(accession)
+        
+        if not target_accessions:
+            print(f"⚠️  [{genus_safe}] No accessions found in list file")
+            return False
+        
+        # 只解压匹配的zip文件 / Only extract matching zip files
+        zip_files = list(zip_folder.glob("*.zip"))
+        extracted_count = 0
+        
+        # 确保临时解压目录存在 / Ensure temporary extraction directory exists
+        temp_extract_dir.mkdir(parents=True, exist_ok=True)
+        
+        for zip_file in zip_files:
+            # 检查zip文件名是否匹配任何目标accession / Check if zip filename matches any target accession
+            zip_accession = zip_file.stem  # 移除.zip扩展名 / Remove .zip extension
+            if zip_accession in target_accessions:
+                try:
+                    # 解压到临时目录（移除.zip扩展名）/ Extract to temporary directory (remove .zip extension)
+                    extract_subdir = temp_extract_dir / zip_file.stem
+                    with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                        zip_ref.extractall(extract_subdir)
+                    print(f"✅ Extracted outgroup zip to temp: {zip_file.name}")
+                    extracted_count += 1
+                except Exception as e:
+                    print(f"❌ Failed to extract {zip_file.name}: {e}")
+                    return False
+        
+        if extracted_count == 0:
+            print(f"⚠️  [{genus_safe}] No matching zip files found for extraction")
+            return False
+        
+        print(f"✅ Successfully extracted {extracted_count} outgroup zip files")
+        return True
+    
     def collect_fna_files(self, genus_dir):
         """
         收集所有fna文件到genus目录根目录 / Collect all fna files to the genus directory root
@@ -463,12 +598,24 @@ class GenomeDownloader:
         temp_genus_dir.mkdir(parents=True, exist_ok=True)
         
         # 下载基因组到目标基础目录 / Download genomes to target base directory
-        if not self.download_genus_with_summary(genus, level, target_base_dir, summary_target_dir):
-            return genus, False
+        if is_outgroup:
+            # 外群使用专用下载方法，不创建单独文件夹 / Outgroup uses dedicated download method, no separate folder
+            if not self.download_outgroup_with_summary(genus, level, target_base_dir, summary_target_dir):
+                return genus, False
+        else:
+            # 目标菌使用常规下载方法 / Target genus uses regular download method
+            if not self.download_genus_with_summary(genus, level, target_base_dir, summary_target_dir):
+                return genus, False
         
         # 解压文件到临时目录 / Extract files to temporary directory
-        if not self.unzip_files_to_temp(target_base_dir, temp_genus_dir):
-            return genus, False
+        if is_outgroup:
+            # 外群使用专用解压方法，只解压外群的zip文件 / Outgroup uses dedicated extraction method, only extract outgroup zip files
+            if not self.unzip_outgroup_files_to_temp(target_base_dir, temp_genus_dir, genus_safe):
+                return genus, False
+        else:
+            # 目标菌使用常规解压方法 / Target genus uses regular extraction method
+            if not self.unzip_files_to_temp(target_base_dir, temp_genus_dir):
+                return genus, False
         
         # 收集fna文件 / Collect fna files
         if not self.collect_fna_files(temp_genus_dir):
@@ -518,7 +665,7 @@ class GenomeDownloader:
         not_found_log = self.work_dir / "not_found.log"
         
         # 提取基因组列表 / Extract genome list
-        list_file = self.extract_genomes_by_level(genus, level)
+        list_file = self.extract_genomes_to_target_dir(genus, level, None, None)
         if not list_file:
             with open(not_found_log, "a") as nf:
                 nf.write(f"[{datetime.now()}] NOT FOUND: {genus} (level: {level})\n")
@@ -755,6 +902,92 @@ class GenomeDownloader:
                     print(f"      ⚠️  {outgroup_safe}_genome_summary.csv not found")
         else:
             print(f"   📊 No outgroups to check summary files for")
+    
+    def download_outgroup_with_summary(self, genus, level="Complete Genome", target_base_dir=None, summary_dir=None):
+        """
+        下载外群基因组并提取summary信息，不创建单独的genus文件夹 / Download outgroup genomes and extract summary, without creating separate genus folders
+        
+        Args:
+            genus (str): 外群属名 / Outgroup genus name
+            level (str): 组装级别过滤 / Assembly level filter
+            target_base_dir (Path): 目标基础目录 / Target base directory
+            summary_dir (Path): summary文件保存目录 / Summary file save directory
+        Returns:
+            bool: 是否成功 / Success status
+        """
+        genus_safe = genus.replace(" ", "_")
+        
+        if target_base_dir is None:
+            print(f"❌ Target base directory is required for outgroup processing")
+            return False
+        
+        # 为外群创建临时下载目录，避免与目标菌zip文件混合 / Create temporary download directory for outgroup to avoid mixing with target zip files
+        temp_download_dir = target_base_dir / "temp_outgroup_download" / genus_safe
+        temp_download_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 确定summary文件保存目录 / Determine summary file save directory
+        if summary_dir is not None:
+            summary_save_dir = summary_dir
+        else:
+            summary_save_dir = target_base_dir
+        summary_save_dir.mkdir(exist_ok=True)
+        
+        log_file = target_base_dir / "download.log"
+        not_found_log = self.work_dir / "not_found.log"
+        
+        # 使用新方法提取基因组列表到临时目录 / Use new method to extract genome list to temporary directory
+        list_file = self.extract_genomes_to_target_dir(genus, level, temp_download_dir, f"{genus_safe}_outgroup_list.txt")
+        if not list_file:
+            with open(not_found_log, "a") as nf:
+                nf.write(f"[{datetime.now()}] NOT FOUND: {genus} (outgroup) (level: {level})\n")
+            print(f"❌ No genomes found for outgroup {genus} with level '{level}'")
+            return False
+        
+        # 提取基因组summary信息到指定目录 / Extract genome summary information to specified directory
+        print(f"📊 Extracting outgroup genome summary information for {genus} to {summary_save_dir}...")
+        summary_file = self.extract_genome_summary_to_dir(genus, level, summary_save_dir)
+        if summary_file:
+            print(f"✅ Outgroup genome summary extracted successfully to {summary_file}")
+        else:
+            print(f"⚠️  Failed to extract outgroup genome summary, but continuing with download")
+        
+        try:
+            # 下载基因组到临时目录 / Download genomes to temporary directory
+            success = self.batch_download_genomes(list_file, temp_download_dir)
+            
+            # 下载成功后，将zip文件移动到目标目录的zip文件夹 / After successful download, move zip files to target directory's zip folder
+            if success:
+                target_zip_dir = target_base_dir / "zip"
+                target_zip_dir.mkdir(exist_ok=True)
+                temp_zip_dir = temp_download_dir / "zip"
+                
+                if temp_zip_dir.exists():
+                    for zip_file in temp_zip_dir.glob("*.zip"):
+                        target_zip_file = target_zip_dir / zip_file.name
+                        shutil.move(str(zip_file), str(target_zip_file))
+                        print(f"✅ Moved outgroup zip file: {zip_file.name}")
+                
+                # 将list文件也复制到目标目录，以便解压时能找到 / Also copy list file to target directory for extraction
+                list_file_path = Path(list_file)
+                target_list_file = target_base_dir / list_file_path.name
+                shutil.copy2(str(list_file_path), str(target_list_file))
+                print(f"✅ Copied outgroup list file: {list_file_path.name}")
+                
+                # 清理临时下载目录 / Clean up temporary download directory
+                shutil.rmtree(temp_download_dir)
+                print(f"🧹 Cleaned up temporary outgroup download directory: {temp_download_dir}")
+            
+            with open(log_file, "a") as f:
+                status = "SUCCESS" if success else "FAIL"
+                f.write(f"[{datetime.now()}] {status}: {genus} (outgroup)\n")
+                if summary_file:
+                    f.write(f"[{datetime.now()}] SUMMARY: {summary_file}\n")
+            return success
+        except Exception as e:
+            with open(log_file, "a") as f:
+                f.write(f"[{datetime.now()}] ERROR: {genus} (outgroup) - {e}\n")
+            print(f"❌ Error downloading outgroup {genus}: {e}")
+            return False
 
 
 def main():

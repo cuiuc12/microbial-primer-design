@@ -902,62 +902,58 @@ class GenomePipeline:
         self.log("🔍 开始查找保守区域...")
         
         def find_conserved_regions_for_gene(alignment_file):
-            """并行处理单个基因的保守区域查找"""
+            """并行处理单个基因的保守区域查找 - 寻找最长保守区域"""
             gene_name = alignment_file.stem.replace("_aln", "")
             conserved_regions = []
             
             try:
-                # 查找保守区域
+                # 查找保守区域 / Find conserved regions
                 from Bio import AlignIO
                 
                 aln = AlignIO.read(alignment_file, "fasta")
                 aln_len = aln.get_alignment_length()
-                found_conserved = False
+                longest_conserved = None
                 
-                # 查找80-400bp的保守区域
-                for win_len in range(80, min(401, aln_len + 1)):
+                # 从最长到最短搜索保守区域，确保找到最长的 / Search from longest to shortest to ensure finding the longest
+                # 搜索范围：从序列长度到50bp / Search range: from sequence length down to 50bp
+                max_search_len = min(aln_len, 500)  # 最大搜索长度500bp / Maximum search length 500bp
+                
+                for win_len in range(max_search_len, 49, -1):  # 从长到短搜索 / Search from long to short
+                    found_at_this_length = False
+                    
                     for start in range(aln_len - win_len + 1):
                         window_seqs = [str(rec.seq[start:start+win_len]).upper() for rec in aln]
                         
-                        # 检查是否完全一致且无gap
-                        if (len(set(window_seqs)) == 1 and  # 所有序列一致
-                            "-" not in window_seqs[0] and   # 无gap
-                            len(window_seqs[0]) >= 80):     # 长度足够
+                        # 检查是否完全一致且无gap / Check if completely identical and no gaps
+                        if (len(set(window_seqs)) == 1 and  # 所有序列一致 / All sequences identical
+                            "-" not in window_seqs[0]):    # 无gap / No gaps
                             
-                            conserved_regions.append({
+                            # 找到最长保守区域，立即返回 / Found longest conserved region, return immediately
+                            longest_conserved = {
                                 'gene': gene_name,
                                 'position': f"{start+1}-{start+win_len}",
                                 'length': win_len,
                                 'sequence': window_seqs[0]
-                            })
-                            found_conserved = True
-                            self.log(f"✅ 发现保守区域: {gene_name} ({win_len}bp)")
+                            }
+                            found_at_this_length = True
                             break
-                    if found_conserved:
+                    
+                    # 如果在当前长度找到保守区域，这就是最长的，停止搜索 / If found at current length, this is the longest, stop searching
+                    if found_at_this_length:
                         break
                 
-                if not found_conserved:
-                    # 尝试查找较短的保守区域 (50-79bp)
-                    for win_len in range(50, 80):
-                        for start in range(aln_len - win_len + 1):
-                            window_seqs = [str(rec.seq[start:start+win_len]).upper() for rec in aln]
-                            
-                            if (len(set(window_seqs)) == 1 and 
-                                "-" not in window_seqs[0]):
-                                
-                                conserved_regions.append({
-                                    'gene': gene_name,
-                                    'position': f"{start+1}-{start+win_len}",
-                                    'length': win_len,
-                                    'sequence': window_seqs[0]
-                                })
-                                found_conserved = True
-                                self.log(f"⚠️  短保守区域: {gene_name} ({win_len}bp)")
-                                break
-                        if found_conserved:
-                            break
-                
-                if not found_conserved:
+                if longest_conserved:
+                    conserved_regions.append(longest_conserved)
+                    length = longest_conserved['length']
+                    if length >= 200:
+                        self.log(f"🎯 发现长保守区域: {gene_name} ({length}bp)")
+                    elif length >= 100:
+                        self.log(f"✅ 发现保守区域: {gene_name} ({length}bp)")
+                    elif length >= 80:
+                        self.log(f"✅ 发现标准保守区域: {gene_name} ({length}bp)")
+                    else:
+                        self.log(f"⚠️  发现短保守区域: {gene_name} ({length}bp)")
+                else:
                     conserved_regions.append({
                         'gene': gene_name,
                         'position': '无保守区域',
@@ -966,7 +962,7 @@ class GenomePipeline:
                     })
                     self.log(f"❌ 无保守区域: {gene_name}")
                 
-                return gene_name, conserved_regions, True, None
+                return gene_name, conserved_regions, longest_conserved is not None, None
                 
             except Exception as e:
                 self.log(f"❌ 分析保守区域失败 {gene_name}: {e}", "ERROR")
@@ -1063,7 +1059,7 @@ class GenomePipeline:
             temp_output_file = primer3_dir / f"temp_output_{gene_name}_{idx}.txt"
             
             try:
-                # 写入Primer3输入 (移除有问题的配置路径)
+                # 写入Primer3输入 (优化产物大小配置)
                 with open(temp_input_file, 'w') as f:
                     f.write(f"SEQUENCE_ID={gene_name}_{idx}\n")
                     f.write(f"SEQUENCE_TEMPLATE={sequence}\n")
@@ -1075,7 +1071,9 @@ class GenomePipeline:
                     f.write("PRIMER_MIN_SIZE=18\n")
                     f.write("PRIMER_MAX_SIZE=25\n")
                     f.write("PRIMER_MAX_NS_ACCEPTED=0\n")
-                    f.write("PRIMER_PRODUCT_SIZE_RANGE=80-200\n")
+                    # 优化产物大小配置 / Optimized product size configuration
+                    f.write("PRIMER_PRODUCT_SIZE_RANGE=100-300 80-200 200-400\n")  # 多个范围选择 / Multiple range options
+                    f.write("PRIMER_OPT_PRODUCT_SIZE=150\n")  # 理想产物大小 / Optimal product size
                     f.write("PRIMER_OPT_TM=60.0\n")
                     f.write("PRIMER_MIN_TM=55.0\n")
                     f.write("PRIMER_MAX_TM=65.0\n")
